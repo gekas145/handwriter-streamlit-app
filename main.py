@@ -26,7 +26,16 @@ def plot_network_output():
 DEFAULT_INPUT = 'hello there'
 
 with st.sidebar:
-    st.button('Regenerate')
+
+    col1, col2 = st.columns(2, gap='medium')
+    with col1:
+        st.button('Regenerate')
+    with col2:
+        st.button('Replay')
+
+    st.markdown('#')
+    
+    st.slider('Smoothness')
 
 canvas = st.container()
 with canvas:
