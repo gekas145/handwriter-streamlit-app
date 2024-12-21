@@ -9,24 +9,30 @@ def plot_network_output():
     fig, ax = plt.subplots()
     fig.set_size_inches(8, 4)
     ax.plot(x, y)
-    user_text_input = st.session_state.get('text_input', None)
-    if user_text_input is None:
-        ax.set_title(default_input_string)
-    elif len(user_text_input) > 0:
-        ax.set_title(user_text_input)
-    return fig, user_text_input
 
-default_input_string = 'hello there'
+    user_text_input = st.session_state.get('text_input', None)
+
+    current_input = None
+    if user_text_input is None:
+        current_input = DEFAULT_INPUT
+    elif len(user_text_input) > 0:
+        current_input = user_text_input
+    else:
+        current_input = st.session_state['last_valid_input']
+
+    ax.set_title(current_input)
+    return fig, current_input
+
+DEFAULT_INPUT = 'hello there'
 
 with st.sidebar:
     st.button('Regenerate')
 
 canvas = st.container()
 with canvas:
-    fig, user_text_input = plot_network_output()
-    x = -1 if user_text_input is None else len(user_text_input)
+    fig, last_valid_input = plot_network_output()
+    st.session_state['last_valid_input'] = last_valid_input
     st.pyplot(fig)
-    st.write(x)
 
     st.text_input('label', 
                   placeholder='Type your sentence',
