@@ -33,7 +33,7 @@ def plot_network_prediction(network_prediction, current_input):
     return fig
 
 def animate_network_prediction(network_prediction, current_input):
-    
+
     def animate(idx, ax, strokes):
         ax.plot(strokes[0, 0:idx], strokes[1, 0:idx], color='black')
         ax.set_xlim(np.min(strokes[0, :]), np.max(strokes[0, :]))
@@ -64,7 +64,8 @@ with st.sidebar:
     st.slider('Smoothness', 
                min_value=0.0,
                max_value=5.0,
-               step=0.1)
+               step=0.1,
+               value=1.5)
     
     st.markdown('#')
 
