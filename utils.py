@@ -95,7 +95,7 @@ def clean_finish_idx(finish_idx):
     finish_idx = finish_idx * (1 - mask) + tf.tile(tf.cast([c.max_steps_inference], tf.float32), (finish_idx.shape[0],)) * mask
     return tf.cast(finish_idx, tf.int32)
 
-def generate_handwriting(model_path, string_transcriptions, corpus, initial_states=None):
+def generate_handwriting(_model, string_transcriptions, corpus, initial_states=None):
     batch_size = len(string_transcriptions)
     transcriptions = [encode_transcription(corpus, t) for t in string_transcriptions]
 
@@ -111,12 +111,8 @@ def generate_handwriting(model_path, string_transcriptions, corpus, initial_stat
     transcriptions_length = tf.constant([len(t) for t in string_transcriptions], dtype=tf.float32)
     finish_idx = tf.tile([-1.0], (transcriptions_length.shape[0],))
 
-    model = Network()
-    model(strokes, transcriptions)
-    model.load_weights(model_path)
-
     for i in range(c.max_steps_inference):
-        output, attention_idx, states = model(strokes[:, -1, :][:, np.newaxis, :], transcriptions, 
+        output, attention_idx, states = _model(strokes[:, -1, :][:, np.newaxis, :], transcriptions, 
                                               training=False, initial_state=states)
         point = generate_point_gaussian(output, smoothness=c.smoothness)
         strokes = tf.concat([strokes, point], axis=1)

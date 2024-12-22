@@ -1,4 +1,3 @@
-import time
 import keras
 import tensorflow as tf
 import numpy as np
@@ -110,3 +109,17 @@ class Network(keras.Model):
         output = self.dense(output)
 
         return output, attention_index, internal_states
+    
+
+class Denormalizer(keras.Model):
+
+    def __init__(self, means, stds, **kwargs):
+        super().__init__(**kwargs)
+        self.means = tf.Variable(means, dtype=tf.float32, trainable=False)
+        self.stds = tf.Variable(stds, dtype=tf.float32, trainable=False)
+
+    def call(self, input):
+        return tf.stack([input[:, 0] * self.stds[0] + self.means[0],
+                         input[:, 1] * self.stds[1] + self.means[1],
+                         input[:, 2]], axis=1)
+
