@@ -119,7 +119,7 @@ class Denormalizer(keras.Model):
         self.stds = tf.Variable(stds, dtype=tf.float32, trainable=False)
 
     def call(self, input):
-        return tf.stack([input[:, 0] * self.stds[0] + self.means[0],
-                         input[:, 1] * self.stds[1] + self.means[1],
-                         input[:, 2]], axis=1)
+        return tf.stack([input[..., 0] * self.stds[0] + self.means[0],
+                         input[..., 1] * self.stds[1] + self.means[1],
+                         input[..., 2]], axis=-1)
 

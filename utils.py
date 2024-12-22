@@ -18,11 +18,6 @@ def plot_writing(ax, data):
     for d in data_split:
         ax.plot(d[:, 0], -d[:, 1], color='black')
 
-def load_standarization_params(standarization_file='model/standarization.csv'):
-    with open(standarization_file, "rb") as f:
-        params = buffer2array(f)
-    return params
-
 def encode_transcription(corpus, string_transcription):
     return [str(corpus.get(char, -1)) for char in string_transcription]
 
@@ -95,20 +90,19 @@ def clean_finish_idx(finish_idx):
     finish_idx = finish_idx * (1 - mask) + tf.tile(tf.cast([c.max_steps_inference], tf.float32), (finish_idx.shape[0],)) * mask
     return tf.cast(finish_idx, tf.int32)
 
-def generate_handwriting(_model, string_transcriptions, corpus, initial_states=None):
-    batch_size = len(string_transcriptions)
-    transcriptions = [encode_transcription(corpus, t) for t in string_transcriptions]
+def get_network_prediction(_model, _denormalizer, string_transcription, _corpus, _initial_states=None):
+    transcriptions = [encode_transcription(_corpus, string_transcription)]
 
-    transcriptions = pad_sequences(transcriptions, 
+    transcriptions = pad_sequences(transcriptions,
                                    value=-1.0, 
                                    maxlen=c.max_transcription_length,
                                    padding='post',
                                    truncating='post')
     transcriptions = tf.one_hot(transcriptions, c.corpus_size, axis=-1)
 
-    strokes = tf.zeros((batch_size, 1, 3))
-    states = initial_states
-    transcriptions_length = tf.constant([len(t) for t in string_transcriptions], dtype=tf.float32)
+    strokes = tf.zeros((1, 1, 3))
+    states = _initial_states
+    transcriptions_length = tf.constant([len(string_transcription)], dtype=tf.float32)
     finish_idx = tf.tile([-1.0], (transcriptions_length.shape[0],))
 
     for i in range(c.max_steps_inference):
@@ -123,10 +117,8 @@ def generate_handwriting(_model, string_transcriptions, corpus, initial_states=N
         if check_finished(finish_idx):
             break
 
-    strokes = strokes.numpy()[:, 1:, :]
     finish_idx = clean_finish_idx(finish_idx)
+    strokes = _denormalizer(strokes[:, 1:, :]).numpy()
 
-    return strokes, finish_idx
+    return strokes[0, 0:finish_idx[0], :]
 
-def buffer2array(buffer, dtype=float):
-    return np.asarray(list(csv.reader(io.TextIOWrapper(buffer))), dtype=dtype)
