@@ -56,6 +56,10 @@ st.session_state['last_valid_input'] = current_input
 
 with st.sidebar:
 
+    st.title("Handwriter")
+
+    st.markdown('#')
+
     if st.button('Regenerate'):
         get_network_prediction.clear()
 
