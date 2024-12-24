@@ -12,13 +12,10 @@ def set_seed(seed):
     np.random.seed(seed)
     random.seed(seed)
 
-def plot_network_prediction(data):
-    fig, ax = plt.subplots(figsize=(8, 4))
+def plot_network_prediction(ax, data):
     data_split = np.split(data, np.where(data[:, -1] == 1)[0] + 1)
     for d in data_split:
-        ax.plot(d[:, 0], -d[:, 1], color='black')
-    
-    return fig
+        ax.plot(d[:, 0], d[:, 1], color='black')
 
 def encode_transcription(corpus, string_transcription):
     return [str(corpus.get(char, -1)) for char in string_transcription]

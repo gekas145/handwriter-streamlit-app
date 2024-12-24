@@ -1,5 +1,6 @@
 import io
 import os
+import math
 import pickle
 import tempfile
 import functools
@@ -46,20 +47,28 @@ def get_current_input():
 
     return current_input
 
-def animate_network_prediction(network_prediction, current_input):
+def animate_network_prediction(network_prediction):
+    def animate(idx, ax, strokes, frame_length):
+        plot_network_prediction(ax, strokes[0:idx*frame_length, :])
+        ax.set_xlim(np.min(strokes[:, 0]), np.max(strokes[:, 0]))
+        ax.set_ylim(np.min(strokes[:, 1]), np.max(strokes[:, 1]))
 
-    def animate(idx, ax, strokes):
-        ax.plot(strokes[0, 0:idx], strokes[1, 0:idx], color='black')
-        ax.set_xlim(np.min(strokes[0, :]), np.max(strokes[0, :]))
-        ax.set_ylim(np.min(strokes[1, :]), np.max(strokes[1, :]))
+    fps = 10
+    frame_length = 15
+    frames = math.ceil(network_prediction.shape[0]/frame_length)
 
-    fig, ax = plt.subplots()
-    fig.set_size_inches(8, 4)
-    ax.set_title(current_input)
+    fig, ax = plt.subplots(figsize=(8, 4))
+    ax.axis('off')
 
+    strokes = np.copy(network_prediction)
+    strokes[:, 1] = np.max(strokes[:, 1]) - strokes[:, 1]
     anim = FuncAnimation(fig,
-                         functools.partial(animate, ax=ax, strokes=network_prediction),
-                         frames=10,
+                         functools.partial(animate, 
+                                           ax=ax, 
+                                           strokes=strokes, 
+                                           frame_length=frame_length),
+                         frames=frames,
+                         interval=1000.0/fps,
                          repeat=False)
 
     return anim
@@ -86,14 +95,20 @@ with st.sidebar:
                min_value=0.0,
                max_value=5.0,
                step=0.1,
-               value=1.5)
+               value=1.5,
+               key='slider')
     
     st.markdown('#')
 
 canvas = st.container()
 with canvas:
-    network_prediction = get_network_prediction(current_input, model, denormalizer, corpus, _smoothness=1.5)
-    fig = plot_network_prediction(network_prediction)
+    network_prediction = get_network_prediction(current_input, model, denormalizer, corpus, 
+                                                _smoothness=st.session_state['slider'])
+    fig, ax = plt.subplots(figsize=(8, 4))
+    ax.axis('off')
+    strokes = np.copy(network_prediction)
+    strokes[:, 1] = -strokes[:, 1]
+    plot_network_prediction(ax, strokes)
     st.pyplot(fig)
 
     st.text_input('label', 
@@ -105,14 +120,13 @@ with canvas:
 png_plot = io.BytesIO()
 fig.savefig(png_plot, format='png')
 
-# animation = animate_network_prediction(network_prediction, current_input)
-# with tempfile.NamedTemporaryFile(delete=False, suffix=".gif") as temp_file:
-#     animation.save(temp_file.name, writer=PillowWriter(fps=10))
+animation = animate_network_prediction(network_prediction)
+with tempfile.NamedTemporaryFile(delete=False, suffix=".gif") as temp_file:
+    animation.save(temp_file.name, writer=PillowWriter(fps=10))
+    temp_file.seek(0)
+    animation_buf = io.BytesIO(temp_file.read())
 
-#     temp_file.seek(0)
-#     animation_buf = io.BytesIO(temp_file.read())
-
-# os.remove(temp_file.name)
+os.remove(temp_file.name)
 
 with st.sidebar:
     col1, col2 = st.columns(2, gap='medium')
@@ -121,10 +135,10 @@ with st.sidebar:
                            data=png_plot,
                            file_name=st.session_state['last_valid_input']+'.png',
                            mime="image/png")
-    # with col2:
-    #     st.download_button('Download GIF',
-    #                        data=animation_buf,
-    #                        file_name=st.session_state['last_valid_input']+'.gif',
-    #                        mime="image/gif")
+    with col2:
+        st.download_button('Download GIF',
+                           data=animation_buf,
+                           file_name=st.session_state['last_valid_input']+'.gif',
+                           mime="image/gif")
 
 

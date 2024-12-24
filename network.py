@@ -114,7 +114,8 @@ class Denormalizer(keras.Model):
         self.stds = tf.Variable(stds, dtype=tf.float32, trainable=False, names='stds')
 
     def call(self, input, **kwargs):
-        return tf.stack([tf.math.cumsum(input[..., 0] * self.stds[0] + self.means[0], axis=-1),
-                         tf.math.cumsum(input[..., 1] * self.stds[1] + self.means[1], axis=-1),
-                         input[..., 2]], axis=-1)
+        x = tf.math.cumsum(input[..., 0] * self.stds[0] + self.means[0], axis=-1)
+        y = tf.math.cumsum(input[..., 1] * self.stds[1] + self.means[1], axis=-1)
+
+        return tf.stack([x, -y, input[..., 2]], axis=-1)
 
