@@ -89,8 +89,8 @@ def clean_finish_idx(finish_idx):
     finish_idx = finish_idx * (1 - mask) + tf.tile(tf.cast([c.max_steps_inference], tf.float32), (finish_idx.shape[0],)) * mask
     return tf.cast(finish_idx, tf.int32)
 
-def get_network_prediction(string_transcription, _model, _denormalizer, _corpus, _smoothness=0.0, _initial_states=None):
-    transcriptions = [encode_transcription(_corpus, string_transcription)]
+def get_network_prediction(string_transcription, _model, _denormalizer, _corpus, _smoothness=0.0, _n_samples=1, _initial_states=None):
+    transcriptions = [encode_transcription(_corpus, string_transcription) for i in range(_n_samples)]
 
     transcriptions = pad_sequences(transcriptions,
                                    value=-1.0, 
@@ -101,7 +101,7 @@ def get_network_prediction(string_transcription, _model, _denormalizer, _corpus,
 
     strokes = tf.zeros((transcriptions.shape[0], 1, 3))
     states = _initial_states
-    transcriptions_length = tf.constant([len(string_transcription)], dtype=tf.float32)
+    transcriptions_length = tf.constant([len(string_transcription)] * _n_samples, dtype=tf.float32)
     finish_idx = tf.tile([-1.0], (transcriptions_length.shape[0],))
 
     for i in range(c.max_steps_inference):
