@@ -4,8 +4,6 @@ import random
 import config as c
 import numpy as np
 import tensorflow as tf
-import matplotlib.pyplot as plt
-from network import Network
 from keras.preprocessing.sequence import pad_sequences
 
 def set_seed(seed):
@@ -90,7 +88,7 @@ def clean_finish_idx(finish_idx):
     finish_idx = finish_idx * (1 - mask) + tf.tile(tf.cast([c.max_steps_inference], tf.float32), (finish_idx.shape[0],)) * mask
     return tf.cast(finish_idx, tf.int32)
 
-def get_network_prediction(_model, _denormalizer, string_transcription, _corpus, _initial_states=None):
+def get_network_prediction(string_transcription, _model, _denormalizer, _corpus, _smoothness=0.0, _initial_states=None):
     transcriptions = [encode_transcription(_corpus, string_transcription)]
 
     transcriptions = pad_sequences(transcriptions,
@@ -100,7 +98,7 @@ def get_network_prediction(_model, _denormalizer, string_transcription, _corpus,
                                    truncating='post')
     transcriptions = tf.one_hot(transcriptions, c.corpus_size, axis=-1)
 
-    strokes = tf.zeros((1, 1, 3))
+    strokes = tf.zeros((transcriptions.shape[0], 1, 3))
     states = _initial_states
     transcriptions_length = tf.constant([len(string_transcription)], dtype=tf.float32)
     finish_idx = tf.tile([-1.0], (transcriptions_length.shape[0],))
@@ -108,7 +106,7 @@ def get_network_prediction(_model, _denormalizer, string_transcription, _corpus,
     for i in range(c.max_steps_inference):
         output, attention_idx, states = _model(strokes[:, -1, :][:, np.newaxis, :], transcriptions, 
                                               training=False, initial_state=states)
-        point = generate_point_gaussian(output, smoothness=c.smoothness)
+        point = generate_point_gaussian(output, smoothness=_smoothness)
         strokes = tf.concat([strokes, point], axis=1)
 
         attention_idx = attention_idx[:, 0, 0]

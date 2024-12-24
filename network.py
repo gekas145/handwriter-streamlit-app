@@ -60,10 +60,8 @@ class Network(keras.Model):
         self.lstm1 = keras.layers.LSTM(c.hidden_size, return_sequences=True, zero_output_for_mask=True, return_state=True)
         self.lstm2 = keras.layers.LSTM(c.hidden_size, return_sequences=True, zero_output_for_mask=True, return_state=True)
         self.dense = keras.layers.Dense(c.output_size)
-        self.lstm_dropout = keras.layers.Dropout(c.lstm_dropout)
-        self.dense_dropout = keras.layers.Dropout(c.dense_dropout)
 
-    def call(self, strokes, transcriptions, mask=None, initial_state=None, training=True):
+    def call(self, strokes, transcriptions, mask=None, initial_state=None, **kwargs):
 
         if initial_state is None:
             initial_state = [None] * 3
@@ -89,7 +87,6 @@ class Network(keras.Model):
         
         # pass through 1st LSTM
         output = hidden_outputs[-1]
-        output = self.lstm_dropout(output, training=training)
         output = tf.concat([output, attention_vectors, strokes], axis=-1)
         output = self.lstm1(output, mask=mask, initial_state=initial_state[1])
         hidden_outputs.append(output[0])
@@ -97,7 +94,6 @@ class Network(keras.Model):
 
         # pass through 2nd LSTM
         output = hidden_outputs[-1]
-        output = self.lstm_dropout(output, training=training)
         output = tf.concat([output, attention_vectors, strokes], axis=-1)
         output = self.lstm2(output, mask=mask, initial_state=initial_state[2])
         hidden_outputs.append(output[0])
@@ -105,7 +101,6 @@ class Network(keras.Model):
 
         # pass through Dense and output
         output = tf.concat(hidden_outputs, axis=-1)
-        output = self.dense_dropout(output, training=training)
         output = self.dense(output)
 
         return output, attention_index, internal_states
@@ -115,11 +110,11 @@ class Denormalizer(keras.Model):
 
     def __init__(self, means, stds, **kwargs):
         super().__init__(**kwargs)
-        self.means = tf.Variable(means, dtype=tf.float32, trainable=False)
-        self.stds = tf.Variable(stds, dtype=tf.float32, trainable=False)
+        self.means = tf.Variable(means, dtype=tf.float32, trainable=False, name='means')
+        self.stds = tf.Variable(stds, dtype=tf.float32, trainable=False, names='stds')
 
-    def call(self, input):
-        return tf.stack([input[..., 0] * self.stds[0] + self.means[0],
-                         input[..., 1] * self.stds[1] + self.means[1],
+    def call(self, input, **kwargs):
+        return tf.stack([tf.math.cumsum(input[..., 0] * self.stds[0] + self.means[0], axis=-1),
+                         tf.math.cumsum(input[..., 1] * self.stds[1] + self.means[1], axis=-1),
                          input[..., 2]], axis=-1)
 
