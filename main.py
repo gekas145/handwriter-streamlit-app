@@ -60,12 +60,10 @@ def animate_network_prediction(network_prediction):
     fig, ax = plt.subplots(figsize=(8, 4))
     ax.axis('off')
 
-    strokes = np.copy(network_prediction)
-    strokes[:, 1] = np.max(strokes[:, 1]) - strokes[:, 1]
     anim = FuncAnimation(fig,
                          functools.partial(animate, 
                                            ax=ax, 
-                                           strokes=strokes, 
+                                           strokes=network_prediction, 
                                            frame_length=frame_length),
                          frames=frames,
                          interval=1000.0/fps,
@@ -106,9 +104,7 @@ with canvas:
                                                 _smoothness=st.session_state['slider'])
     fig, ax = plt.subplots(figsize=(8, 4))
     ax.axis('off')
-    strokes = np.copy(network_prediction)
-    strokes[:, 1] = -strokes[:, 1]
-    plot_network_prediction(ax, strokes)
+    plot_network_prediction(ax, network_prediction)
     st.pyplot(fig)
 
     st.text_input('label', 
