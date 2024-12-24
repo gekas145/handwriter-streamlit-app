@@ -4,6 +4,7 @@ import random
 import config as c
 import numpy as np
 import tensorflow as tf
+import matplotlib.pyplot as plt
 from keras.preprocessing.sequence import pad_sequences
 
 def set_seed(seed):
@@ -11,10 +12,13 @@ def set_seed(seed):
     np.random.seed(seed)
     random.seed(seed)
 
-def plot_writing(ax, data):
+def plot_network_prediction(data):
+    fig, ax = plt.subplots(figsize=(8, 4))
     data_split = np.split(data, np.where(data[:, -1] == 1)[0] + 1)
     for d in data_split:
         ax.plot(d[:, 0], -d[:, 1], color='black')
+    
+    return fig
 
 def encode_transcription(corpus, string_transcription):
     return [str(corpus.get(char, -1)) for char in string_transcription]
