@@ -1,10 +1,7 @@
-import io
-import csv
 import random
 import config as c
 import numpy as np
 import tensorflow as tf
-import matplotlib.pyplot as plt
 from keras.preprocessing.sequence import pad_sequences
 
 def set_seed(seed):
@@ -89,8 +86,8 @@ def clean_finish_idx(finish_idx):
     finish_idx = finish_idx * (1 - mask) + tf.tile(tf.cast([c.max_steps_inference], tf.float32), (finish_idx.shape[0],)) * mask
     return tf.cast(finish_idx, tf.int32)
 
-def get_network_prediction(string_transcription, _model, _denormalizer, _corpus, _smoothness=0.0, _n_samples=1, _initial_states=None):
-    transcriptions = [encode_transcription(_corpus, string_transcription) for i in range(_n_samples)]
+def get_network_prediction(string_transcription, model, denormalizer, corpus, smoothness=0.0, n_samples=1):
+    transcriptions = [encode_transcription(corpus, string_transcription) for i in range(n_samples)]
 
     transcriptions = pad_sequences(transcriptions,
                                    value=-1.0, 
@@ -100,14 +97,14 @@ def get_network_prediction(string_transcription, _model, _denormalizer, _corpus,
     transcriptions = tf.one_hot(transcriptions, c.corpus_size, axis=-1)
 
     strokes = tf.zeros((transcriptions.shape[0], 1, 3))
-    states = _initial_states
-    transcriptions_length = tf.constant([len(string_transcription)] * _n_samples, dtype=tf.float32)
+    states = None
+    transcriptions_length = tf.constant([len(string_transcription)] * n_samples, dtype=tf.float32)
     finish_idx = tf.tile([-1.0], (transcriptions_length.shape[0],))
 
     for i in range(c.max_steps_inference):
-        output, attention_idx, states = _model(strokes[:, -1, :][:, np.newaxis, :], transcriptions, 
+        output, attention_idx, states = model(strokes[:, -1, :][:, np.newaxis, :], transcriptions, 
                                               training=False, initial_state=states)
-        point = generate_point_gaussian(output, smoothness=_smoothness)
+        point = generate_point_gaussian(output, smoothness=smoothness)
         strokes = tf.concat([strokes, point], axis=1)
 
         attention_idx = attention_idx[:, 0, 0]
@@ -117,7 +114,8 @@ def get_network_prediction(string_transcription, _model, _denormalizer, _corpus,
             break
 
     finish_idx = clean_finish_idx(finish_idx)
-    strokes = _denormalizer(strokes[:, 1:, :]).numpy()
+    strokes = denormalizer(strokes[:, 1:, :]).numpy()
+    strokes = [strokes[i, 0:finish_idx[i], :] for i in range(n_samples)]
 
-    return strokes[0, 0:finish_idx[0], :]
+    return strokes
 

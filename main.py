@@ -6,12 +6,12 @@ import tempfile
 import functools
 import config as c
 import numpy as np
+import utils as ut
 import streamlit as st
 import tensorflow as tf
 import matplotlib.pyplot as plt
 from network import Network, Denormalizer
 from matplotlib.animation import FuncAnimation, PillowWriter
-from utils import plot_network_prediction, get_network_prediction
 
 @st.cache_resource
 def load_corpus():
@@ -33,7 +33,12 @@ def load_denormalizer():
     denormalizer.load_weights('model/denormalizer.h5')
     return denormalizer
 
-get_network_prediction = st.cache_data(get_network_prediction)
+@st.cache_data
+def get_network_prediction(string_transcription, _model, _denormalizer, _corpus, _smoothness=0.0, _n_samples=1):
+    st.session_state['sample_id'] = 0
+    return ut.get_network_prediction(string_transcription, _model, _denormalizer, _corpus, 
+                                     smoothness=_smoothness, 
+                                     n_samples=_n_samples)
 
 def get_current_input():
     user_text_input = st.session_state.get('text_input', None)
@@ -49,7 +54,7 @@ def get_current_input():
 
 def animate_network_prediction(network_prediction):
     def animate(idx, ax, strokes, frame_length):
-        plot_network_prediction(ax, strokes[0:idx*frame_length, :])
+        ut.plot_network_prediction(ax, strokes[0:idx*frame_length, :])
         ax.set_xlim(np.min(strokes[:, 0]), np.max(strokes[:, 0]))
         ax.set_ylim(np.min(strokes[:, 1]), np.max(strokes[:, 1]))
 
@@ -72,8 +77,11 @@ def animate_network_prediction(network_prediction):
     return anim
 
 DEFAULT_INPUT = 'hello there'
+N_SAMPLES = 10
 current_input = get_current_input()
 st.session_state['last_valid_input'] = current_input
+if st.session_state.get('sample_id', None) is None:
+    st.session_state['sample_id'] = 0
 model = load_model()
 denormalizer = load_denormalizer()
 corpus = load_corpus()
@@ -85,7 +93,9 @@ with st.sidebar:
     st.markdown('#')
 
     if st.button('Regenerate'):
-        get_network_prediction.clear()
+        st.session_state['sample_id'] = (st.session_state['sample_id'] + 1) % N_SAMPLES
+        if st.session_state['sample_id'] == 0:
+            get_network_prediction.clear()
 
     st.markdown('#')
     
@@ -101,10 +111,11 @@ with st.sidebar:
 canvas = st.container()
 with canvas:
     network_prediction = get_network_prediction(current_input, model, denormalizer, corpus, 
-                                                _smoothness=st.session_state['slider'])
+                                                _smoothness=st.session_state['slider'],
+                                                _n_samples=N_SAMPLES)
     fig, ax = plt.subplots(figsize=(8, 4))
     ax.axis('off')
-    plot_network_prediction(ax, network_prediction)
+    ut.plot_network_prediction(ax, network_prediction[st.session_state['sample_id']])
     st.pyplot(fig)
 
     st.text_input('label', 
@@ -116,7 +127,7 @@ with canvas:
 png_plot = io.BytesIO()
 fig.savefig(png_plot, format='png')
 
-animation = animate_network_prediction(network_prediction)
+animation = animate_network_prediction(network_prediction[st.session_state['sample_id']])
 with tempfile.NamedTemporaryFile(delete=False, suffix=".gif") as temp_file:
     animation.save(temp_file.name, writer=PillowWriter(fps=10))
     temp_file.seek(0)
