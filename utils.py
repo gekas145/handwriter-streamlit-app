@@ -5,6 +5,8 @@ import tensorflow as tf
 from keras.preprocessing.sequence import pad_sequences
 
 def set_seed(seed):
+    if seed is None:
+        return
     tf.random.set_seed(seed)
     np.random.seed(seed)
     random.seed(seed)
@@ -86,7 +88,9 @@ def clean_finish_idx(finish_idx):
     finish_idx = finish_idx * (1 - mask) + tf.tile(tf.cast([c.max_steps_inference], tf.float32), (finish_idx.shape[0],)) * mask
     return tf.cast(finish_idx, tf.int32)
 
-def get_network_prediction(string_transcription, model, denormalizer, corpus, smoothness=0.0, n_samples=1):
+def get_network_prediction(string_transcription, model, denormalizer, corpus, smoothness=0.0, n_samples=1, seed=None):
+    set_seed(seed)
+
     transcriptions = [encode_transcription(corpus, string_transcription) for i in range(n_samples)]
 
     transcriptions = pad_sequences(transcriptions,
