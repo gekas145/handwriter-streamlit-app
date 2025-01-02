@@ -35,10 +35,19 @@ def load_denormalizer():
 
 @st.cache_data
 def get_network_prediction(string_transcription, _model, _denormalizer, _corpus, _smoothness=0.0, _n_samples=1):
-    st.session_state['sample_id'] = 0
+    st.session_state.sample_id = 0
     return ut.get_network_prediction(string_transcription, _model, _denormalizer, _corpus, 
                                      smoothness=_smoothness, 
                                      n_samples=_n_samples)
+
+@st.cache_resource
+def get_initial_strokes():
+    with open('model/initial_stokes.pickle', 'rb') as f:
+        strokes = pickle.load(f)
+    return [np.array(p) for p in strokes]
+
+def on_text_input_change():
+    st.session_state.first_run_flag = False
 
 def get_current_input():
     user_text_input = st.session_state.get('text_input', None)
@@ -48,7 +57,7 @@ def get_current_input():
     elif len(user_text_input) > 0:
         current_input = user_text_input
     else:
-        current_input = st.session_state['last_valid_input']
+        current_input = st.session_state.last_valid_input
 
     return current_input
 
@@ -78,25 +87,30 @@ def animate_network_prediction(network_prediction):
 
 DEFAULT_INPUT = 'hello there'
 N_SAMPLES = 10
+INITIAL_STROKES = get_initial_strokes()
 current_input = get_current_input()
-st.session_state['last_valid_input'] = current_input
-if st.session_state.get('sample_id', None) is None:
-    st.session_state['sample_id'] = 0
+st.session_state.last_valid_input = current_input
+
+if not 'sample_id' in st.session_state:
+    st.session_state.sample_id = 0
+
+if not 'first_run_flag' in st.session_state:
+    st.session_state.first_run_flag = True
+
 model = load_model()
 denormalizer = load_denormalizer()
 corpus = load_corpus()
 
 with st.sidebar:
 
-    st.title("Handwriter")
-
+    st.title('Handwriter')
     st.markdown('#')
 
     if st.button('Regenerate'):
-        st.session_state['sample_id'] = (st.session_state['sample_id'] + 1) % N_SAMPLES
-        if st.session_state['sample_id'] == 0:
+        st.session_state.sample_id = (st.session_state.sample_id + 1) % N_SAMPLES
+        if st.session_state.sample_id == 0:
             get_network_prediction.clear()
-
+            st.session_state.first_run_flag = False
     st.markdown('#')
     
     st.slider('Smoothness', 
@@ -105,20 +119,23 @@ with st.sidebar:
                step=0.1,
                value=1.5,
                key='slider')
-    
     st.markdown('#')
 
-canvas = st.container()
-with canvas:
-    network_prediction = get_network_prediction(current_input, model, denormalizer, corpus, 
-                                                _smoothness=st.session_state['slider'],
-                                                _n_samples=N_SAMPLES)
+main_frame = st.container()
+with main_frame:
+    if st.session_state.first_run_flag:
+        network_prediction = INITIAL_STROKES
+    else:
+        network_prediction = get_network_prediction(current_input, model, denormalizer, corpus, 
+                                                    _smoothness=st.session_state.slider,
+                                                    _n_samples=N_SAMPLES)
     fig, ax = plt.subplots(figsize=(8, 4))
     ax.axis('off')
-    ut.plot_network_prediction(ax, network_prediction[st.session_state['sample_id']])
+    ut.plot_network_prediction(ax, network_prediction[st.session_state.sample_id])
     st.pyplot(fig)
 
-    st.text_input('label', 
+    st.text_input('label',
+                  on_change=on_text_input_change,
                   placeholder='Type your sentence',
                   label_visibility='collapsed',
                   max_chars=32,
@@ -127,7 +144,7 @@ with canvas:
 png_plot = io.BytesIO()
 fig.savefig(png_plot, format='png')
 
-animation = animate_network_prediction(network_prediction[st.session_state['sample_id']])
+animation = animate_network_prediction(network_prediction[st.session_state.sample_id])
 with tempfile.NamedTemporaryFile(delete=False, suffix=".gif") as temp_file:
     animation.save(temp_file.name, writer=PillowWriter(fps=10))
     temp_file.seek(0)
@@ -140,12 +157,12 @@ with st.sidebar:
     with col1:
         st.download_button('Download PNG',
                            data=png_plot,
-                           file_name=st.session_state['last_valid_input']+'.png',
+                           file_name=st.session_state.last_valid_input+'.png',
                            mime="image/png")
     with col2:
         st.download_button('Download GIF',
                            data=animation_buf,
-                           file_name=st.session_state['last_valid_input']+'.gif',
+                           file_name=st.session_state.last_valid_input+'.gif',
                            mime="image/gif")
 
 
