@@ -85,7 +85,7 @@ def animate_network_prediction(network_prediction):
 
     return anim
 
-DEFAULT_INPUT = 'hello there'
+DEFAULT_INPUT = 'hello there!'
 N_SAMPLES = 10
 INITIAL_STROKES = get_initial_strokes()
 current_input = get_current_input()
