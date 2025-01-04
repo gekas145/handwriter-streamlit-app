@@ -13,4 +13,10 @@ max_transcription_length = 32
 max_steps_inference = 1000
 last_index_offset = 0
 
+# app constants
+default_input = 'hello there!'
+progress_bar_text = 'Magic happening, please stand by'
+ready_text = 'All ready, enjoy'
+n_samples = 10 # how many samples of handwritten text will be generated at once
+
 

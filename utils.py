@@ -1,5 +1,6 @@
+import time
 import random
-import config as c
+import config
 import numpy as np
 import tensorflow as tf
 from keras.preprocessing.sequence import pad_sequences
@@ -28,7 +29,7 @@ def process_output_gaussian(output, logits=False, smoothness=0.0):
     if not logits:
         p = tf.sigmoid(p)
 
-    params = tf.reshape(output[..., 1:], (nbatch, -1, c.n_distr, 6))
+    params = tf.reshape(output[..., 1:], (nbatch, -1, config.n_distr, 6))
     
     weights = params[..., 0]
     weights *= 1.0 + smoothness
@@ -76,7 +77,7 @@ def generate_point_gaussian(output, smoothness=0.0):
     return point[:, np.newaxis, :]
 
 def update_finish_idx(attention_idx, transcriptions_length, current_finish_idx, iteration):
-    mask = tf.math.logical_and(attention_idx >= transcriptions_length + c.last_index_offset, current_finish_idx == -1.0)
+    mask = tf.math.logical_and(attention_idx >= transcriptions_length + config.last_index_offset, current_finish_idx == -1.0)
     mask = tf.cast(mask, dtype=tf.float32)
     return current_finish_idx * (1 - mask) + iteration * mask
 
@@ -85,27 +86,27 @@ def check_finished(finish_idx):
 
 def clean_finish_idx(finish_idx):
     mask = tf.cast(finish_idx == -1, tf.float32)
-    finish_idx = finish_idx * (1 - mask) + tf.tile(tf.cast([c.max_steps_inference], tf.float32), (finish_idx.shape[0],)) * mask
+    finish_idx = finish_idx * (1 - mask) + tf.tile(tf.cast([config.max_steps_inference], tf.float32), (finish_idx.shape[0],)) * mask
     return tf.cast(finish_idx, tf.int32)
 
-def get_network_prediction(string_transcription, model, denormalizer, corpus, smoothness=0.0, n_samples=1, seed=None):
+def get_network_prediction(string_transcription, model, denormalizer, corpus, progress_bar, smoothness=0.0, n_samples=1, seed=None):
     set_seed(seed)
 
     transcriptions = [encode_transcription(corpus, string_transcription) for i in range(n_samples)]
 
     transcriptions = pad_sequences(transcriptions,
                                    value=-1.0, 
-                                   maxlen=c.max_transcription_length,
+                                   maxlen=config.max_transcription_length,
                                    padding='post',
                                    truncating='post')
-    transcriptions = tf.one_hot(transcriptions, c.corpus_size, axis=-1)
+    transcriptions = tf.one_hot(transcriptions, config.corpus_size, axis=-1)
 
     strokes = tf.zeros((transcriptions.shape[0], 1, 3))
     states = None
     transcriptions_length = tf.constant([len(string_transcription)] * n_samples, dtype=tf.float32)
     finish_idx = tf.tile([-1.0], (transcriptions_length.shape[0],))
 
-    for i in range(c.max_steps_inference):
+    for i in range(config.max_steps_inference):
         output, attention_idx, states = model(strokes[:, -1, :][:, np.newaxis, :], transcriptions, 
                                               training=False, initial_state=states)
         point = generate_point_gaussian(output, smoothness=smoothness)
@@ -114,8 +115,14 @@ def get_network_prediction(string_transcription, model, denormalizer, corpus, sm
         attention_idx = attention_idx[:, 0, 0]
         finish_idx = update_finish_idx(attention_idx, transcriptions_length, finish_idx, i)
 
+        progress_bar.progress((i+1)/config.max_steps_inference, text=config.progress_bar_text)
+
         if check_finished(finish_idx):
             break
+    
+    progress_bar.progress(1.0, text=config.ready_text)
+    time.sleep(1)
+    progress_bar.empty()
 
     finish_idx = clean_finish_idx(finish_idx)
     strokes = denormalizer(strokes[:, 1:, :]).numpy()
