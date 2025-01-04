@@ -1,7 +1,7 @@
 import keras
 import tensorflow as tf
 import numpy as np
-import config as c
+import config
 
 class CustomRNNCell(keras.layers.Layer):
 
@@ -9,10 +9,10 @@ class CustomRNNCell(keras.layers.Layer):
 
         super().__init__(**kwargs)
 
-        self.n_mixtures = c.n_mixtures
+        self.n_mixtures = config.n_mixtures
         self.dense = keras.layers.Dense(3*self.n_mixtures)
-        self.lstm_cell = keras.layers.LSTMCell(c.hidden_size)
-        self.state_size = (c.corpus_size, self.n_mixtures, c.hidden_size, c.hidden_size)
+        self.lstm_cell = keras.layers.LSTMCell(config.hidden_size)
+        self.state_size = (config.corpus_size, self.n_mixtures, config.hidden_size, config.hidden_size)
 
     def call(self, input_at_t, states_at_t, constants):
         '''
@@ -57,9 +57,9 @@ class Network(keras.Model):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.custom_rnn = keras.layers.RNN(CustomRNNCell(), return_sequences=True, zero_output_for_mask=True, return_state=True)
-        self.lstm1 = keras.layers.LSTM(c.hidden_size, return_sequences=True, zero_output_for_mask=True, return_state=True)
-        self.lstm2 = keras.layers.LSTM(c.hidden_size, return_sequences=True, zero_output_for_mask=True, return_state=True)
-        self.dense = keras.layers.Dense(c.output_size)
+        self.lstm1 = keras.layers.LSTM(config.hidden_size, return_sequences=True, zero_output_for_mask=True, return_state=True)
+        self.lstm2 = keras.layers.LSTM(config.hidden_size, return_sequences=True, zero_output_for_mask=True, return_state=True)
+        self.dense = keras.layers.Dense(config.output_size)
 
     def call(self, strokes, transcriptions, mask=None, initial_state=None, **kwargs):
 
@@ -70,8 +70,8 @@ class Network(keras.Model):
         indexes_dim = transcriptions.shape[1] + 1
         indexes = tf.range(1, indexes_dim + 1, dtype=np.float32)
         indexes = tf.tile(tf.expand_dims(indexes, 0), (strokes.shape[0], 1))
-        indexes = tf.tile(indexes, (1, c.n_mixtures))
-        indexes = tf.reshape(indexes, (strokes.shape[0], c.n_mixtures, indexes_dim))
+        indexes = tf.tile(indexes, (1, config.n_mixtures))
+        indexes = tf.reshape(indexes, (strokes.shape[0], config.n_mixtures, indexes_dim))
 
         # pass through custom RNN
         output = self.custom_rnn(strokes, 
@@ -81,9 +81,9 @@ class Network(keras.Model):
         
         internal_states = [output[1:]]
         output = output[0]
-        attention_vectors = output[..., c.hidden_size:c.hidden_size + transcriptions.shape[-1]]
-        attention_index = output[..., c.hidden_size + transcriptions.shape[-1]:]
-        hidden_outputs = [output[..., :c.hidden_size]]
+        attention_vectors = output[..., config.hidden_size:config.hidden_size + transcriptions.shape[-1]]
+        attention_index = output[..., config.hidden_size + transcriptions.shape[-1]:]
+        hidden_outputs = [output[..., :config.hidden_size]]
         
         # pass through 1st LSTM
         output = hidden_outputs[-1]

@@ -4,7 +4,7 @@ import math
 import pickle
 import tempfile
 import functools
-import config as c
+import config
 import numpy as np
 import utils as ut
 import streamlit as st
@@ -22,23 +22,24 @@ def load_corpus():
 @st.cache_resource
 def load_model():
     model = Network()
-    model(tf.zeros((1, 1, c.input_size)), tf.zeros((1, 1, c.corpus_size)))
+    model(tf.zeros((1, 1, config.input_size)), tf.zeros((1, 1, config.corpus_size)))
     model.load_weights('model/model.h5')
     return model
 
 @st.cache_resource
 def load_denormalizer():
     denormalizer = Denormalizer(tf.zeros(2), tf.zeros(2))
-    denormalizer(tf.zeros((1, 1, c.input_size)))
+    denormalizer(tf.zeros((1, 1, config.input_size)))
     denormalizer.load_weights('model/denormalizer.h5')
     return denormalizer
 
-@st.cache_data
-def get_network_prediction(string_transcription, _model, _denormalizer, _corpus, _smoothness=0.0, _n_samples=1):
+@st.cache_data(ttl=600, max_entries=20, show_spinner=False)
+def get_network_prediction(string_transcription, smoothness, _model, _denormalizer, _corpus):
     st.session_state.sample_id = 0
-    return ut.get_network_prediction(string_transcription, _model, _denormalizer, _corpus, 
-                                     smoothness=_smoothness, 
-                                     n_samples=_n_samples)
+    progress_bar = st.progress(0, text=config.progress_bar_text)
+    return ut.get_network_prediction(string_transcription, _model, _denormalizer, _corpus, progress_bar, 
+                                     smoothness=smoothness, 
+                                     n_samples=config.n_samples)
 
 @st.cache_resource
 def get_initial_strokes():
@@ -46,14 +47,14 @@ def get_initial_strokes():
         strokes = pickle.load(f)
     return [np.array(p) for p in strokes]
 
-def on_text_input_change():
+def on_text_input_or_slider_change():
     st.session_state.first_run_flag = False
 
 def get_current_input():
     user_text_input = st.session_state.get('text_input', None)
     current_input = None
     if user_text_input is None:
-        current_input = DEFAULT_INPUT
+        current_input = config.default_input
     elif len(user_text_input) > 0:
         current_input = user_text_input
     else:
@@ -85,9 +86,7 @@ def animate_network_prediction(network_prediction):
 
     return anim
 
-DEFAULT_INPUT = 'hello there!'
-N_SAMPLES = 10
-INITIAL_STROKES = get_initial_strokes()
+initial_strokes = get_initial_strokes()
 current_input = get_current_input()
 st.session_state.last_valid_input = current_input
 
@@ -107,7 +106,7 @@ with st.sidebar:
     st.markdown('#')
 
     if st.button('Regenerate'):
-        st.session_state.sample_id = (st.session_state.sample_id + 1) % N_SAMPLES
+        st.session_state.sample_id = (st.session_state.sample_id + 1) % config.n_samples
         if st.session_state.sample_id == 0:
             get_network_prediction.clear()
             st.session_state.first_run_flag = False
@@ -118,24 +117,27 @@ with st.sidebar:
                max_value=5.0,
                step=0.1,
                value=1.5,
+               on_change=on_text_input_or_slider_change,
                key='slider')
     st.markdown('#')
 
 main_frame = st.container()
 with main_frame:
     if st.session_state.first_run_flag:
-        network_prediction = INITIAL_STROKES
+        network_prediction = initial_strokes
     else:
-        network_prediction = get_network_prediction(current_input, model, denormalizer, corpus, 
-                                                    _smoothness=st.session_state.slider,
-                                                    _n_samples=N_SAMPLES)
+        network_prediction = get_network_prediction(current_input, 
+                                                    st.session_state.slider, 
+                                                    model, 
+                                                    denormalizer, 
+                                                    corpus)
     fig, ax = plt.subplots(figsize=(8, 4))
     ax.axis('off')
     ut.plot_network_prediction(ax, network_prediction[st.session_state.sample_id])
     st.pyplot(fig)
 
     st.text_input('label',
-                  on_change=on_text_input_change,
+                  on_change=on_text_input_or_slider_change,
                   placeholder='Type your sentence',
                   label_visibility='collapsed',
                   max_chars=32,
