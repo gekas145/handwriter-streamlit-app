@@ -33,7 +33,7 @@ def load_denormalizer():
     denormalizer.load_weights('model/denormalizer.h5')
     return denormalizer
 
-@st.cache_data
+@st.cache_data(ttl=600, max_entries=20)
 def get_network_prediction(string_transcription, _model, _denormalizer, _corpus, _smoothness=0.0, _n_samples=1):
     st.session_state.sample_id = 0
     return ut.get_network_prediction(string_transcription, _model, _denormalizer, _corpus, 
